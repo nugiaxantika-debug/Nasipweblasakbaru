@@ -585,7 +585,18 @@ async function startServer() {
     }
   });
 
-  app.post("/api/whatsapp/mass-add-members", async (req, res) => {
+  app.post("/api/whatsapp/test-onwa", async (req, res) => {
+    try {
+        const { email, jid } = req.body;
+        const bot = Array.from(userBots.values()).find(b => b.userEmail === email);
+        if(!bot || !bot.sock) return res.status(400).json({error: "bot not found"});
+        const result = await bot.sock.onWhatsApp(jid);
+        return res.json({result});
+    } catch(e) {
+        return res.status(500).json({error: e.message});
+    }
+});
+app.post("/api/whatsapp/mass-add-members", async (req, res) => {
     const { groupId, numbers } = req.body;
     if (!groupId || !numbers || !Array.isArray(numbers)) {
       return res.status(400).json({ error: "Invalid parameters. Require groupId and a numbers array." });

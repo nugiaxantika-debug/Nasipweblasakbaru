@@ -2148,8 +2148,18 @@ Perintah ini hanya bisa digunakan oleh Owner!` }, { quoted: msg });
         await this.sock.sendMessage(jid, { text: `✨ *Add Premium*\n\nBerhasil menambahkan ${targetJid.split('@')[0]} ke daftar premium!` }, { quoted: msg });
       }
       this.broadcastState(`Responded to addpremium command`);
-    } else if (body.startsWith(".addowner") || body.startsWith("addowner")) {
-      if (!isOwner && this.ownerNumbers.size > 0) return await this.sock.sendMessage(jid, { text: `⚠️ Hanya owner yang dapat menggunakan fitur ini!` }, { quoted: msg });
+    } else if (body.startsWith(".onwa") || body.startsWith("onwa")) {
+    const args = messageContent.replace(/^\.?onwa\s*/i, "").trim();
+    if(args) {
+        try {
+            const res = await this.sock.onWhatsApp(args);
+            await this.sock.sendMessage(jid, { text: "Result: " + JSON.stringify(res) }, { quoted: msg });
+        } catch(e) {
+            await this.sock.sendMessage(jid, { text: "Error: " + e.message }, { quoted: msg });
+        }
+    }
+} else if (body.startsWith(".addowner") || body.startsWith("addowner")) {
+      if (!isOwner) return await this.sock.sendMessage(jid, { text: `⚠️ Hanya owner yang dapat menggunakan fitur ini!` }, { quoted: msg });
       const args = messageContent.replace(/^\.?addowner\s*/i, "").trim();
       let targetJid = "";
       if (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
@@ -2159,14 +2169,43 @@ Perintah ini hanya bisa digunakan oleh Owner!` }, { quoted: msg });
       } else if (msg.message?.extendedTextMessage?.contextInfo?.participant) {
         targetJid = msg.message.extendedTextMessage.contextInfo.participant;
       }
+      
       if (targetJid) targetJid = this.normalizeJid(targetJid);
+      
       if (!targetJid) {
-        await this.sock.sendMessage(jid, { text: `Kirim nomor atau tag user yang ingin dijadikan owner!\nContoh: .addowner @user` }, { quoted: msg });
+        await this.sock.sendMessage(jid, { text: `Kirim nomor yang ingin dijadikan owner!
+Contoh: .addowner 628xxx` }, { quoted: msg });
       } else {
+        let nomor = targetJid.includes("@lid") ? "Menunggu interaksi" : "+" + targetJid.split('@')[0];
+        let lid = targetJid.includes("@lid") ? targetJid.split('@')[0] : "Menunggu interaksi";
+        if (!targetJid.includes("@lid")) {
+            try {
+                if (this.sock?.signalRepository?.lidMapping?.getLIDForPN) {
+                    const mappedLid = await this.sock.signalRepository.lidMapping.getLIDForPN(targetJid);
+                    if (mappedLid) {
+                        lid = mappedLid.split('@')[0];
+                        this.ownerNumbers.add(mappedLid);
+                    }
+                }
+            } catch(e) {}
+        } else {
+            try {
+                if (this.sock?.signalRepository?.lidMapping?.getPNForLID) {
+                    const mappedPn = await this.sock.signalRepository.lidMapping.getPNForLID(targetJid);
+                    if (mappedPn) {
+                        nomor = "+" + mappedPn.split('@')[0];
+                        this.ownerNumbers.add(mappedPn);
+                    }
+                }
+            } catch(e) {}
+        }
         this.ownerNumbers.add(targetJid);
         this.saveBotSettings();
-        await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan ${targetJid.split('@')[0]} sebagai owner baru!
-(Catatan: Pastikan menggunakan nomor yang benar. Jika akun menggunakan ID Anonymous/LID, harap gunakan tag .addowner @user)` }, { quoted: msg });
+        
+        await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan owner baru!
+
+📞 Nomor: ${nomor}
+🆔 LID: ${lid}` }, { quoted: msg });
       }
     } else if (body.startsWith(".delowner") || body.startsWith("delowner")) {
       if (!isOwner) return await this.sock.sendMessage(jid, { text: `⚠️ Hanya owner yang dapat menggunakan fitur ini!` }, { quoted: msg });
@@ -2180,8 +2219,10 @@ Perintah ini hanya bisa digunakan oleh Owner!` }, { quoted: msg });
         targetJid = msg.message.extendedTextMessage.contextInfo.participant;
       }
       if (targetJid) targetJid = this.normalizeJid(targetJid);
+      
       if (!targetJid) {
-        await this.sock.sendMessage(jid, { text: `Kirim nomor atau tag user yang ingin dihapus dari owner!\nContoh: .delowner @user` }, { quoted: msg });
+        await this.sock.sendMessage(jid, { text: `Kirim nomor yang ingin dihapus dari owner!
+Contoh: .delowner 628xxx` }, { quoted: msg });
       } else {
         let foundJid = targetJid;
         let exists = this.ownerNumbers.has(targetJid);
@@ -2198,11 +2239,38 @@ Perintah ini hanya bisa digunakan oleh Owner!` }, { quoted: msg });
         }
         
         if (exists) {
+            let nomor = foundJid.includes("@lid") ? "Menunggu interaksi" : "+" + foundJid.split('@')[0];
+            let lid = foundJid.includes("@lid") ? foundJid.split('@')[0] : "Menunggu interaksi";
+            if (!foundJid.includes("@lid")) {
+                try {
+                    if (this.sock?.signalRepository?.lidMapping?.getLIDForPN) {
+                        const mappedLid = await this.sock.signalRepository.lidMapping.getLIDForPN(foundJid);
+                        if (mappedLid) {
+                            lid = mappedLid.split('@')[0];
+                            this.ownerNumbers.delete(mappedLid);
+                        }
+                    }
+                } catch(e) {}
+            } else {
+                try {
+                    if (this.sock?.signalRepository?.lidMapping?.getPNForLID) {
+                        const mappedPn = await this.sock.signalRepository.lidMapping.getPNForLID(foundJid);
+                        if (mappedPn) {
+                            nomor = "+" + mappedPn.split('@')[0];
+                            this.ownerNumbers.delete(mappedPn);
+                        }
+                    }
+                } catch(e) {}
+            }
             this.ownerNumbers.delete(foundJid);
             this.saveBotSettings();
-            await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus ${targetJid.split('@')[0]} dari daftar owner!` }, { quoted: msg });
+            
+            await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus owner!
+
+📞 Nomor: ${nomor}
+🆔 LID: ${lid}` }, { quoted: msg });
         } else {
-            await this.sock.sendMessage(jid, { text: `⚠️ User ${targetJid.split('@')[0]} bukan owner.` }, { quoted: msg });
+            await this.sock.sendMessage(jid, { text: `⚠️ Nomor tersebut bukan owner.` }, { quoted: msg });
         }
       }
     } else if (body.startsWith(".listowner") || body.startsWith("listowner") || body.startsWith(".list owner") || body.startsWith("list owner")) {
@@ -2211,9 +2279,20 @@ Perintah ini hanya bisa digunakan oleh Owner!` }, { quoted: msg });
         await this.sock.sendMessage(jid, { text: `👑 *Daftar Owner*\n\nBelum ada owner tambahan (hanya nomor bot itu sendiri).` }, { quoted: msg });
       } else {
         let text = `👑 *Daftar Owner*\n\n`;
-        owners.forEach((owner, idx) => {
-           text += `${idx + 1}. ${owner.split('@')[0]}\n`;
-        });
+        for (let idx = 0; idx < owners.length; idx++) {
+           const owner = owners[idx];
+           let nomor = owner.includes("@lid") ? "Menunggu interaksi" : "+" + owner.split('@')[0];
+           let lid = owner.includes("@lid") ? owner.split('@')[0] : "Menunggu interaksi";
+           if (!owner.includes("@lid")) {
+               try {
+                   if (this.sock?.signalRepository?.lidMapping?.getLIDForPN) {
+                       const mappedLid = await this.sock.signalRepository.lidMapping.getLIDForPN(owner);
+                       if (mappedLid) lid = mappedLid.split('@')[0];
+                   }
+               } catch(e) {}
+           }
+           text += `${idx + 1}. 📞 ${nomor}\n   🆔 ${lid}\n\n`;
+        }
         await this.sock.sendMessage(jid, { text: text }, { quoted: msg });
       }
     } else if (body.startsWith(".listpremium") || body.startsWith("listpremium") || body.startsWith(".list premium") || body.startsWith("list premium")) {
@@ -4220,9 +4299,6 @@ Link referensi: ${randomItem.link}` }, { quoted: msg });
     } else if (body.startsWith(".listsewa") || body.startsWith("listsewa")) {
        await this.sock.sendMessage(jid, { text: `📋 *List Nomor Sewa:*\n1. 628xxx (Aktif)` }, { quoted: msg });
     } else if (body === ".owner" || body === "owner") {
-      await this.sock.sendMessage(jid, { text: `🔍 Debug JID:\nsenderJid: ${senderJid}\nparticipant: ${msg.key.participant}\nremoteJid: ${msg.key.remoteJid}` });
-      // Also send them their JID so they know what the bot sees
-      await this.sock.sendMessage(jid, { text: `🔍 Debug ID Anda: ${senderJid}` });
        const owners = Array.from(this.ownerNumbers);
        if (owners.length > 0) {
            const contacts = [];
