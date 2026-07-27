@@ -934,7 +934,7 @@ export class WhatsAppBot {
       let menu = `Halo user saya adalah 
 Bot WhatsApp terbaru
 Bisa membantu kamu
-
+${this.menuLink ? `\n🔗 Link: ${this.menuLink}` : ''}
 📅 Tanggal: ${dateStr}
 ⏰ Waktu: ${timeStr}
 
