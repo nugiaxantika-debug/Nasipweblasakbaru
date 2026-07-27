@@ -2803,20 +2803,21 @@ Contoh: .delowner 628xxx` }, { quoted: msg });
             
             const tmpId = Date.now() + Math.random().toString(36).substring(2, 7);
             const tmpRaw = `/tmp/yt_${tmpId}.raw`;
-            const tmpFixedMp3 = `/tmp/yt_${tmpId}_fixed.mp3`;
-            
+            const tmpFixedAudio = `/tmp/yt_${tmpId}_fixed.ogg`;
             fs.writeFileSync(tmpRaw, buffer);
             try {
-              execSync(`ffmpeg -y -i ${tmpRaw} -c:a libmp3lame -b:a 128k -map 0:a:0 -f mp3 ${tmpFixedMp3}`);
-              const fixedBuffer = fs.readFileSync(tmpFixedMp3);
-              await this.sock.sendMessage(jid, { audio: fixedBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
+              // Convert to OPUS for WhatsApp Voice Note compatibility
+              execSync(`ffmpeg -y -i ${tmpRaw} -c:a libopus -b:a 48k -vbr on -compression_level 10 -frame_duration 20 -application voip ${tmpFixedAudio}`);
+              const fixedBuffer = fs.readFileSync(tmpFixedAudio);
+              // Send as voice note (ptt: true) with correct mimetype
+              await this.sock.sendMessage(jid, { audio: fixedBuffer, mimetype: 'audio/ogg; codecs=opus', ptt: true }, { quoted: msg });
             } catch (convErr) {
               console.error("FFmpeg conversion error:", convErr);
               // Fallback to sending as document if conversion fails
               await this.sock.sendMessage(jid, { document: buffer, mimetype: 'audio/mpeg', fileName: `${title}.mp3` }, { quoted: msg });
             } finally {
               if (fs.existsSync(tmpRaw)) fs.unlinkSync(tmpRaw);
-              if (fs.existsSync(tmpFixedMp3)) fs.unlinkSync(tmpFixedMp3);
+              if (fs.existsSync(tmpFixedAudio)) fs.unlinkSync(tmpFixedAudio);
             }
           } catch (dlError) {
             await this.sock.sendMessage(jid, { text: "❌ *Gagal mengunduh audio dari server (link mati/timeout).*" }, { quoted: msg });
